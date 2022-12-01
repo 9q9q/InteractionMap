@@ -74,7 +74,7 @@ class ML_FISTA(object):
         if flag is None:
             flag = [True] * self.network.nb_layers
 
-        for i in tqdm(range(self.network.nb_layers)):
+        for i in range(self.network.nb_layers):
             if gamma_in[i] is not None:
                 gamma[i] = gamma_in[i]
             else:

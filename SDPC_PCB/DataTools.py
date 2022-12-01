@@ -494,7 +494,10 @@ def gaussian_kernel(size, sigma=2):
     gaussian_kernel = gaussian_kernel.view(1, 1, size[-2], size[-1])
     gaussian_kernel = gaussian_kernel.repeat(size[0], size[1], 1, 1)
 
-    return gaussian_kernel
+    if torch.cuda.is_available():
+        return gaussian_kernel.cuda()
+    else:
+        return gaussian_kernel
 
 
 def to_img(x):

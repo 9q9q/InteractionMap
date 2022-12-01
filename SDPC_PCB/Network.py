@@ -68,14 +68,29 @@ class LayerPC(nn.Module):
             return nn.Parameter(dico_load)
 
     def forward(self, x):
-
         return f.conv2d(x, self.dico, stride=self.stride, groups=self.groups, padding=self.pad) + self.bias
 
     def backward(self, x):
+        # in: [128, 32, 22, 22]
+        # out: [128, 16, 29, 29]
         if self.drop is not None:
             x = self.drop(self, x)
+
+        # print("dico shape: {}".format(self.dico_shape))
+        # print("x in: {}".format(x.size()))
+        # dims from https://pytorch.org/docs/stable/generated/torch.nn.ConvTranspose2d.html#torch.nn.ConvTranspose2d
+        # h_out = (x.size(2)-1) * self.stride - 2*self.pad + \
+        #     self.dico_shape[2] + self.out_pad
+        # w_out = (x.size(3)-1)*self.stride - 2*self.pad + \
+        #     self.dico_shape[3] + self.out_pad
+        # # size = (x.size(0), self.dico_shape[1], h_out, w_out)
+        # size = (h_out, w_out)
+        # x = f.interpolate(x, size=size, mode="nearest")
+        # print("x after interp: {}".format(x.size()))
         x = f.conv_transpose2d(x, self.dico, stride=self.stride,
-                               padding=self.pad, output_padding=self.out_pad, groups=self.groups)
+                               padding=self.pad, output_padding=self.out_pad,
+                               groups=self.groups)
+        # print("x out: {}".format(x.size()))
         return x
 
     def to_next(self, x):
@@ -167,127 +182,3 @@ class Network(object):
         else:
             for param in self.layers[i].parameters():
                 param.requires_grad = True
-
-
-'''
-class MaxPool2d(nn.Module):
-
-    def __init__(self, kernel_size, stride=1):
-        super(MaxPool2d, self).__init__()
-
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.pool = torch.nn.MaxPool2d(kernel_size, stride=stride, return_indices=True)
-        self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-        if torch.cuda.is_available():
-            self.pool = self.pool.cuda()
-            self.unpool = self.unpool.cuda()
-
-        #self.pool = torch.nn.MaxPool2d(kernel_size, stride=stride, return_indices=True)
-        #self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-
-    def to_next(self, layer, x):
-
-        x, _ = self.pool(x)
-        return x
-
-    def to_previous(self, layer, x):
-
-        w = (x.size()[-2] - 1) * self.stride + self.kernel_size
-        h = (x.size()[-1] - 1) * self.stride + self.kernel_size
-        c_size = x.size()[0]
-        d_size = layer.dico.data.size()[0]
-
-        _, idx = self.pool(torch.randn(c_size, d_size, w, h).cuda())
-
-        #if torch.cuda.is_available:
-        #    _, idx = self.pool(torch.randn(c_size, d_size, w, h).cuda())
-        #else:
-        #    _, idx = self.pool(torch.randn(c_size, d_size, w, h))
-
-        return self.unpool(x, idx)
-
-
-## with padding
-class AvgPool2d(nn.Module):
-
-    def __init__(self, kernel_size, stride=1):
-        super(AvgPool2d, self).__init__()
-
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.pool = torch.nn.AvgPool2d(kernel_size, stride=stride)
-        self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-        if torch.cuda.is_available():
-            self.pool = self.pool.cuda()
-            self.unpool = self.unpool.cuda()
-        self.init = True
-
-        # self.pool = torch.nn.MaxPool2d(kernel_size, stride=stride, return_indices=True)
-        # self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-
-    def to_next(self, layer, x):
-
-        if self.init == True:
-            self.input_size = x.size()
-            self.init = False
-        x = self.pool(x)
-
-        return x
-
-    def to_previous(self, layer, x):
-        x = f.interpolate(x, size=self.input_size[-1], mode='bilinear', align_corners=True)
-        return x
-
-
-class RescaleFeedback(Function):
-
-    @staticmethod
-    def forward(ctx, input, v):
-        ctx.save_for_backward(input, v)
-        return  v*input
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        input, v = ctx.saved_tensors
-        grad_input = grad_v =  None
-        if ctx.needs_input_grad[0]:
-            grad_input = grad_output.div(v**2)
-        if ctx.needs_input_grad[1]:
-            grad_v = None#(grad_output*input).sum()
-
-
-        return grad_input, grad_v
-
-
-class MaxPool2d_b(nn.Module):
-
-    def __init__(self, kernel_size, stride=1):
-        super(MaxPool2d_b, self).__init__()
-
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.pool = torch.nn.MaxPool2d(kernel_size, stride=stride, return_indices=True)
-        self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-        if torch.cuda.is_available():
-            self.pool = self.pool.cuda()
-            self.unpool = self.unpool.cuda()
-        self.init = True
-
-        # self.pool = torch.nn.MaxPool2d(kernel_size, stride=stride, return_indices=True)
-        # self.unpool = torch.nn.MaxUnpool2d(kernel_size, stride=stride)
-
-    def to_next(self, layer, x):
-
-        if self.init == True:
-            self.input_size = x.size()
-            self.init = False
-        x, _ = self.pool(x)
-
-        return x
-
-    def to_previous(self, layer, x):
-        x = f.interpolate(x, size=self.input_size[-1], mode='bilinear', align_corners=True)
-        return x
-
-'''
